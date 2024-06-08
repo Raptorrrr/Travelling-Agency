@@ -36,14 +36,17 @@ func RequireAuth(c *gin.Context) {
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		var user models.User
+		config.DB.First(&user, claims["sub"])
 		// check expiration date jwt token
 		if float64(time.Now().Unix()) > claims["exp"].(float64) {
+			// logout status
+			config.DB.Model(&user).Update("is_login", false)
 			c.AbortWithStatus(http.StatusUnauthorized)
 		}
 
 		// find the user with token sub
-		var user models.User
-		config.DB.First(&user, claims["sub"])
+
 		if user.ID == 0 {
 			c.AbortWithStatus(http.StatusUnauthorized)
 		}

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"login-jwt/config"
 	"login-jwt/models"
 	"net/http"
@@ -34,6 +35,8 @@ func SignUp(c *gin.Context) {
 	}
 
 	user.Password = string(hash)
+	user.IsLogin = false
+	user.Role = "user"
 
 	// create a user
 	result := config.DB.Create(&user)
@@ -77,6 +80,9 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// status login
+	config.DB.Model(&user).Update("is_login", true)
+
 	// Create a new token object, specifying signing method and the claims
 	// you would like it to contain.
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -102,8 +108,15 @@ func Login(c *gin.Context) {
 }
 
 func GetUser(c *gin.Context) {
-
 	user, _ := c.Get("user")
+
+	if !user.(models.User).IsLogin {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message": "please login first",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": user,
 	})
@@ -114,6 +127,14 @@ func UpdateUser(c *gin.Context) {
 
 	userr, _ := c.Get("user")
 	id, _ := strconv.Atoi(c.Param("id"))
+
+	// check status login
+	if !userr.(models.User).IsLogin {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message": "please login first",
+		})
+		return
+	}
 
 	// check if id token match with id
 	if !validateId(id, int(userr.(models.User).ID)) {
@@ -152,6 +173,14 @@ func ChangePassword(c *gin.Context) {
 
 	userr, _ := c.Get("user")
 	id, _ := strconv.Atoi(c.Param("id"))
+
+	// check status login
+	if !userr.(models.User).IsLogin {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message": "please login first",
+		})
+		return
+	}
 
 	// get data from database
 	config.DB.First(&user, id)
@@ -195,6 +224,65 @@ func ChangePassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "password change success",
 	})
+}
+
+func Logout(c *gin.Context) {
+	var user models.User
+	userr, _ := c.Get("user")
+
+	if !userr.(models.User).IsLogin {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message": "youre already logout",
+		})
+		return
+	}
+	config.DB.First(&user, userr.(models.User).ID)
+	config.DB.Model(&user).Update("is_login", false)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "youre loggout",
+	})
+}
+
+func DeleteUser(c *gin.Context) {
+	var user models.User
+	var req struct {
+		Password string
+	}
+
+	userr, _ := c.Get("user")
+	id, _ := strconv.Atoi(c.Param("id"))
+
+	// check if id token match id database
+	if !validateId(id, int(userr.(models.User).ID)) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "User not found",
+		})
+		return
+	}
+
+	// get data from database
+	config.DB.First(&user, id)
+
+	// check request
+	if c.Bind(&req) != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid Password",
+		})
+		return
+	}
+	if !comparePassword([]byte(user.Password), []byte(req.Password)) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid Password",
+		})
+		return
+	}
+
+	// delete data
+	config.DB.Unscoped().Delete(&user)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "account deleted",
+	})
 
 }
 
@@ -210,6 +298,8 @@ func validateId(id int, idToken int) bool {
 }
 
 func comparePassword(hash []byte, password []byte) bool {
+	fmt.Println(hash)
+	fmt.Println(password)
 	err := bcrypt.CompareHashAndPassword(hash, password)
 	return err == nil
 }
