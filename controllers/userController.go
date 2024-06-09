@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"fmt"
 	"login-jwt/config"
 	"login-jwt/models"
 	"net/http"
@@ -36,7 +35,6 @@ func SignUp(c *gin.Context) {
 
 	user.Password = string(hash)
 	user.IsLogin = false
-	user.Role = "user"
 
 	// create a user
 	result := config.DB.Create(&user)
@@ -237,6 +235,9 @@ func Logout(c *gin.Context) {
 		return
 	}
 	config.DB.First(&user, userr.(models.User).ID)
+
+	c.SetCookie("Authorization", "", -1, "/", "", false, true)
+
 	config.DB.Model(&user).Update("is_login", false)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "youre loggout",
@@ -286,6 +287,37 @@ func DeleteUser(c *gin.Context) {
 
 }
 
+func GetAllUser(c *gin.Context) {
+	var userr []models.User
+	user, _ := c.Get("user")
+	if !user.(models.User).IsLogin {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message": "please login first",
+		})
+		return
+	}
+
+	if user.(models.User).Role != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{
+			"message": "user doesn't have access",
+		})
+		return
+	}
+
+	result := config.DB.Find(&userr)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": "error retrieving users",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"user": userr,
+	})
+
+}
+
 func validateId(id int, idToken int) bool {
 	var user models.User
 
@@ -298,8 +330,7 @@ func validateId(id int, idToken int) bool {
 }
 
 func comparePassword(hash []byte, password []byte) bool {
-	fmt.Println(hash)
-	fmt.Println(password)
+
 	err := bcrypt.CompareHashAndPassword(hash, password)
 	return err == nil
 }
