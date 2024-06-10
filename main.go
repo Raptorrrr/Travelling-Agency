@@ -30,5 +30,11 @@ func main() {
 	r.DELETE("/destination/delete/:id", middleware.RequireAuth, controllers.DeleteDestination)
 	r.GET("/destinations", middleware.RequireAuth, controllers.GetAllDestination)
 
+	r.POST("/:destinations/create-package", middleware.RequireAuth, controllers.CreatePackage)
+	r.PUT("/:destinations/:id", middleware.RequireAuth, controllers.EditPackage)
+	r.DELETE("/:destinations/:id", middleware.RequireAuth, controllers.DeletePackage)
+	r.GET("/packages/:destinations", middleware.RequireAuth, controllers.GetAllPackageByCity)
+	r.GET("/packages", middleware.RequireAuth, controllers.GetAllPackage)
+
 	r.Run()
 }

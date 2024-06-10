@@ -236,7 +236,7 @@ func Logout(c *gin.Context) {
 	}
 	config.DB.First(&user, userr.(models.User).ID)
 
-	c.SetCookie("Authorization", "", -1, "/", "", false, true)
+	// c.SetCookie("Authorization", "", -1, "/", "", false, true)
 
 	config.DB.Model(&user).Update("is_login", false)
 	c.JSON(http.StatusOK, gin.H{
